@@ -1,6 +1,9 @@
 # Twitter Clone Implementation Steps
 
-This document breaks down the implementation of the Twitter clone project into small, self-contained, and ordered steps.
+This document breaks down the implementation of the Twitter clone project into small, self-contained, and ordered steps.  
+It integrates the high-level plan with concrete development steps for clarity and iterative delivery.
+
+---
 
 ## 1. Project Setup
 
@@ -14,103 +17,202 @@ This document breaks down the implementation of the Twitter clone project into s
         -   `backend`: For the .NET API project.
         -   `frontend`: For the React frontend project.
         -   `docs`: For project documentation.
+    -   Add `.gitignore` for .NET, Node, and Docker.
+
+---
 
 ## 2. Backend Development (.NET 9)
 
--   [ ] **Step 2.1: Initialize .NET Web API Project**
+### 2.1 Project Initialization
+
+-   [x] **Step 2.1: Initialize .NET Web API Project**
     -   Inside the `backend` directory, create a new .NET 9 Web API project.
-    -   Choose the "API" template with controllers.
+    -   Choose the "API" template with controllers (or minimal APIs).
     -   Enable Docker support (optional, but recommended).
+    -   Add base packages for configuration, logging, and Swagger.
+
+### 2.2 Database Setup
 
 -   [ ] **Step 2.2: Setup Database with Entity Framework Core**
-    -   Add the necessary NuGet packages for EF Core and the PostgreSQL provider (`Npgsql.EntityFrameworkCore.PostgreSQL`).
-    -   Define the data models (`User`, `Post`, `Follow`, `Like`, `RefreshToken`) in the project.
-    -   Configure the `DbContext` and the database connection string.
-    -   Create the initial database migration and apply it to the database.
+    -   Add NuGet packages:
+        -   `Microsoft.EntityFrameworkCore`
+        -   `Npgsql.EntityFrameworkCore.PostgreSQL`
+        -   `Microsoft.AspNetCore.Identity.EntityFrameworkCore`
+    -   Define data models:
+        -   `User` (Id, Username, Email, PasswordHash, DisplayName, Bio, AvatarUrl, CreatedAt, UpdatedAt).
+        -   `Post` (Id, AuthorId, Content, ReplyToPostId, MediaUrls, CreatedAt, UpdatedAt).
+        -   `Follow` (Id, FollowerId, FollowedId, CreatedAt).
+        -   `Like` (Id, UserId, PostId, CreatedAt).
+        -   `RefreshToken` (Id, UserId, TokenHash, ExpiresAt, RevokedAt).
+    -   Configure `AppDbContext` with relationships and constraints.
+    -   Create initial migration and apply with `dotnet ef database update`.
+    -   (Optional) Add a seeding step with a test user and sample posts.
+
+### 2.3 Authentication & Security
 
 -   [ ] **Step 2.3: Implement User Authentication**
-    -   Set up ASP.NET Core Identity for user management.
-    -   Implement the `POST /api/auth/register` endpoint for user registration.
-    -   Implement the `POST /api/auth/login` endpoint for user login, returning a JWT access token and a refresh token.
-    -   Implement the `POST /api/auth/refresh` endpoint to get a new access token using a refresh token.
-    -   Implement the `POST /api/auth/logout` endpoint to revoke refresh tokens.
+    -   Use ASP.NET Core Identity with EF Core.
+    -   Implement endpoints:
+        -   `POST /api/auth/register` — create new user (hash password).
+        -   `POST /api/auth/login` — verify credentials, return JWT + refresh token.
+        -   `POST /api/auth/refresh` — issue new JWT from refresh token. use HttpOnly, Secure cookie for refresh tokens
+        -   `POST /api/auth/logout` — revoke refresh token.
+    -   Security notes:
+        -   Use HttpOnly + Secure cookies for refresh tokens.
+        -   Store refresh tokens hashed in DB.
+        -   Short TTL for JWTs (e.g., 15m).
+        -   Rate-limit login attempts.
+
+### 2.4 User Profile
 
 -   [ ] **Step 2.4: Implement User Profile Management**
-    -   Implement the `GET /api/users/{username}` endpoint to get a user's public profile.
-    -   Implement the `PUT /api/users/me` endpoint to update the authenticated user's profile.
+    -   `GET /api/users/{username}` — fetch public profile.
+    -   `PUT /api/users/me` — update profile (bio, display name, avatar).
+    -   Enforce authentication for self-updates.
+
+### 2.5 Follow System
 
 -   [ ] **Step 2.5: Implement Follow System**
-    -   Implement the `POST /api/users/{username}/follow` endpoint to follow a user.
-    -   Implement the `POST /api/users/{username}/unfollow` endpoint to unfollow a user.
+    -   `POST /api/users/{username}/follow` — follow user.
+    -   `POST /api/users/{username}/unfollow` — unfollow user.
+    -   Store relationships in `Follow` table.
+
+### 2.6 Posts & Timeline
 
 -   [ ] **Step 2.6: Implement Post Management**
-    -   Implement the `POST /api/posts` endpoint to create a new post.
-    -   Implement the `GET /api/posts/{id}` endpoint to get a single post.
-    -   Implement the `GET /api/posts` endpoint to list posts by author.
-    -   Implement the `GET /api/timeline` endpoint to get the user's timeline.
+    -   `POST /api/posts` — create post (text + optional media).
+    -   `GET /api/posts/{id}` — get single post.
+    -   `GET /api/posts?author=username&cursor=...&limit=20` — list author’s posts (paginated).
+    -   `GET /api/timeline?cursor=...&limit=20` — fetch timeline (own + followed users).
+    -   Add configurable character limit (e.g., 280 chars).
+
+### 2.7 Likes & Replies
 
 -   [ ] **Step 2.7: Implement Likes and Replies**
-    -   Implement the `POST /api/posts/{id}/like` endpoint to like/unlike a post.
-    -   Implement the `POST /api/posts/{id}/reply` endpoint to reply to a post.
+    -   `POST /api/posts/{id}/like` — like/unlike a post (toggle).
+    -   `POST /api/posts/{id}/reply` — reply to a post (threaded, one-level or nested).
+
+### 2.8 Search
 
 -   [ ] **Step 2.8: Implement Basic Search**
-    -   Implement a basic search functionality to search for users by username and posts by text content.
+    -   Search for users by username.
+    -   Search for posts by text content.
+    -   Simple SQL `LIKE` queries initially; Postgres full-text later (nice-to-have).
+
+### 2.9 Media Uploads
 
 -   [ ] **Step 2.9: Implement Media Uploads**
-    -   Implement the `POST /api/media/request-upload` endpoint to handle media uploads.
-    -   Choose a storage option (local storage or MinIO) and configure it.
+    -   `POST /api/media/request-upload` — return signed URL (MinIO/S3) or handle multipart upload (local storage).
+    -   Save URLs/paths in `Post.MediaUrls` JSONB field.
+    -   Storage options:
+        -   Local: `/data/uploads`.
+        -   MinIO (S3-compatible) with Docker Compose.
+    -   Validate file size/type (e.g., max 5–10MB, `image/jpeg/png`).
 
-## 3. Frontend Development (React)**
+---
+
+## 3. Frontend Development (React + Vite + TS)
+
+### 3.1 Project Setup
 
 -   [ ] **Step 3.1: Initialize React Project**
-    -   Inside the `frontend` directory, create a new React project using Vite.
-    -   Choose the TypeScript template.
+    -   Inside `frontend`, run `npm create vite@latest` with TypeScript template.
+    -   Install dependencies: `react-router-dom`, `axios`, `zustand` (optional), `tailwindcss`.
+
+### 3.2 Structure & Routing
 
 -   [ ] **Step 3.2: Setup Project Structure and Routing**
-    -   Organize the project into `pages`, `components`, `hooks`, `api`, and `state` directories.
-    -   Set up client-side routing using a library like `react-router-dom`.
+    -   Folder structure:
+        -   `src/api` — API client.
+        -   `src/components` — reusable UI.
+        -   `src/pages` — routed pages.
+        -   `src/hooks` — custom hooks (`useAuth`, `useTimeline`).
+        -   `src/state` — context or Zustand store.
+    -   Configure routing with `react-router-dom`.
+
+### 3.3 Authentication Pages
 
 -   [ ] **Step 3.3: Implement Authentication Pages**
-    -   Create the `LoginPage` and `RegisterPage` components.
-    -   Implement the authentication forms and API calls to the backend.
-    -   Implement a `useAuth` hook for managing authentication state.
+    -   `LoginPage` + `RegisterPage` with forms.
+    -   Call backend `/auth` endpoints.
+    -   Implement `useAuth` hook to track auth state, JWT refresh.
+
+### 3.4 Core UI Components
 
 -   [ ] **Step 3.4: Implement Core UI Components**
-    -   Create reusable UI components like `Button`, `Avatar`, `PostCard`, and `PostComposer`.
+    -   `Button`, `Avatar`, `PostCard`, `PostComposer`, `ProfileHeader`.
+    -   TailwindCSS for styling.
+
+### 3.5 Main Pages
 
 -   [ ] **Step 3.5: Implement Main Pages**
-    -   Create the `HomePage` to display the user's timeline.
-    -   Create the `ProfilePage` to display user profiles.
-    -   Create the `PostPage` to display a single post with replies.
+    -   `HomePage` — user’s timeline.
+    -   `ProfilePage` — user profile with posts.
+    -   `PostPage` — single post + replies.
+
+### 3.6 State Management
 
 -   [ ] **Step 3.6: Implement State Management**
-    -   Use React Context and hooks for simple state management.
-    -   Consider using a library like Zustand or Redux for more complex state.
+    -   Start with Context + hooks.
+    -   Consider Zustand or Redux for advanced state.
+
+### 3.7 Backend Integration
 
 -   [ ] **Step 3.7: Connect Frontend to Backend**
-    -   Create an API client to handle communication with the backend API.
-    -   Implement token handling and automatic token refresh.
+    -   API client wrapper for fetch/axios.
+    -   Handle JWT refresh automatically on 401.
+    -   Proxy API requests in Vite dev server.
 
-## 4. Dockerization**
+---
+
+## 4. Dockerization
 
 -   [ ] **Step 4.1: Dockerize the Backend**
-    -   Create a `Dockerfile` for the .NET API.
-    -   Ensure the Dockerfile is optimized for build and runtime performance.
+    -   Multi-stage Dockerfile: build (SDK) → runtime (ASP.NET Core).
+    -   Expose port 5000.
+    -   Include migrations in container entrypoint.
 
 -   [ ] **Step 4.2: Dockerize the Frontend**
-    -   Create a `Dockerfile` for the React frontend.
-    -   Use a multi-stage build to create a small production image.
+    -   Multi-stage Dockerfile: build with Node → serve with nginx.
+    -   Expose port 80.
 
-## 5. Deployment**
+---
+
+## 5. Deployment
 
 -   [ ] **Step 5.1: Create Docker Compose Configuration**
-    -   Create a `docker-compose.yml` file to orchestrate the `backend`, `frontend`, `postgres`, and an optional `minio` service.
-    -   Configure environment variables and volumes.
+    -   `docker-compose.yml` with services:
+        -   `db` (Postgres).
+        -   `backend` (.NET API).
+        -   `frontend` (React/nginx).
+        -   `minio` (optional).
+        -   `nginx` (reverse proxy).
+    -   Use volumes for Postgres + media storage.
 
 -   [ ] **Step 5.2: Local Development Setup**
-    -   Create a `docker-compose.dev.yml` for local development with features like hot-reloading.
-    -   Provide instructions on how to set up and run the project locally.
+    -   Create `docker-compose.dev.yml` for hot reloading.
+    -   Mount source into containers (`dotnet watch`, Vite dev server).
+    -   Document `cp .env.example .env` setup.
 
 -   [ ] **Step 5.3: VPS Deployment**
-    -   Provide instructions on how to deploy the application to a single VPS.
-    -   Include instructions for setting up a reverse proxy (nginx or Caddy) for SSL termination.
+    -   Deploy to a single VPS.
+    -   Run `docker compose up -d`.
+    -   Use nginx or Caddy as reverse proxy.
+        -   Caddy can auto-issue TLS certs.
+        -   nginx requires manual LetsEncrypt setup.
+    -   Expose only ports 80/443.
+
+---
+
+## 6. Phase 2 (Nice-to-Have Features)
+
+-   Real-time updates with WebSockets/SignalR.
+-   Pagination & cursor-based APIs.
+-   Full-text search with Postgres `tsvector`.
+-   Image resizing & avatar cropping.
+-   Rate limiting.
+-   Email verification & password reset.
+-   Admin panel for moderation.
+-   Observability (Prometheus, Grafana, structured logs).
+
+---
