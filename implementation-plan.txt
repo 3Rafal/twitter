@@ -1,0 +1,382 @@
+Twitter clone — detailed implementation plan
+
+Stack: React (frontend) + .NET 9 (backend). Run on a single VPS using Docker Compose. Hobby project — focus on clarity, developer experience, and iterative delivery.
+
+1. Project goals & constraints
+
+Primary goal: Build a working Twitter-like application (posts, follow, timeline, likes, replies, basic search, user profiles) that can run on a single VPS via Docker Compose. Not production-grade; but secure enough for personal use.
+
+Constraints: Minimal scaling requirements, single-region VPS, local or S3-compatible media storage, Postgres for persistence, simple reverse proxy (nginx or Caddy).
+
+Audience: You (developer) and an AI agent that will act on subtasks.
+
+2. Minimum Viable Product (MVP) features
+
+User signup / login (email + password) with JWT + refresh tokens.
+
+User profile (handle, display name, bio, avatar).
+
+Create a Tweet-like post (text, optional image). Character limit configurable (e.g., 280).
+
+Timeline (posts from followed users + own posts) in reverse chronological order.
+
+Follow / unfollow users.
+
+Like / unlike posts.
+
+Reply to posts (threaded one-level or nested minimally).
+
+Basic search by username and post text (simple DB search; full-text index optional).
+
+Persistent storage: Postgres.
+
+Local image storage (or MinIO) with direct upload via signed URL optional.
+
+Docker Compose orchestration and deployment instructions for the VPS.
+
+3. Non-MVP / Nice-to-have (phase 2+)
+
+Real-time updates (WebSockets / SignalR) for timeline and notifications.
+
+Pagination & cursor-based timeline API.
+
+Full-text search with Postgres tsvector or ElasticSearch.
+
+Image resizing & thumbnails, avatar cropping.
+
+Rate limiting per IP / user.
+
+Email verification & password reset.
+
+Admin panel for moderation.
+
+Metrics and basic observability (Prometheus + Grafana or logs).
+
+4. High-level architecture
+
+Frontend (React): Single-page app. Communicates with backend via REST + WebSocket for live updates (optional). Built and served as static files behind nginx.
+
+Backend (.NET 9 Web API): REST API using ASP.NET Core. Business logic, authentication, database access (Entity Framework Core), background tasks (if needed: Hangfire or lightweight worker), file upload endpoints.
+
+Database: PostgreSQL.
+
+Cache / PubSub (optional): Redis for caching and pub/sub for real-time features.
+
+Object storage: Local filesystem (for hobby) or MinIO (S3-compatible) if you want more flexible storage and easier backups.
+
+Reverse proxy: nginx or Caddy in front of API + frontend for SSL termination.
+
+ASCII diagram:
+
+[Browser (React SPA)]
+        |
+    HTTPS |  REST / WebSockets
+        v
+[Reverse proxy (nginx/caddy)]
+   /              \
+  v                v
+[React static]    [.NET 9 API]
+                    |   |
+                    |   +--> Redis (optional)
+                    |
+                    +--> PostgreSQL
+                    |
+                    +--> Object storage (local/MinIO)
+
+5. Detailed tech choices & reasons
+
+.NET 9 (ASP.NET Core): modern C# features, long-term support, built-in DI, minimal APIs or MVC controllers.
+
+EF Core + Npgsql: convenient ORM, migrations, query support for Postgres.
+
+PostgreSQL: reliable relational DB with JSONB & full-text options.
+
+React: component-based UI; create-react-app or Vite (recommended: Vite for faster dev experience).
+
+State management: start with React Context + hooks for small app; optionally introduce Zustand or Redux for complex state.
+
+Authentication: JWT access token (short lived) + refresh token (rotating) stored as HttpOnly secure cookie or in client storage depending on CORS model. For simplicity, use cookie-based refresh token + bearer access token stored in memory.
+
+Docker Compose: single docker-compose.yml to run api, frontend, postgres, minio (optional), nginx.
+
+6. Data model (core entities)
+
+Below are simplified models and important fields. Use EF Core classes and migrations.
+
+User
+
+Id (GUID)
+
+Username (unique)
+
+DisplayName
+
+Email (unique)
+
+PasswordHash
+
+Bio
+
+AvatarUrl
+
+CreatedAt
+
+UpdatedAt
+
+Follow
+
+Id
+
+FollowerId (User)
+
+FollowedId (User)
+
+CreatedAt
+
+Post (Tweet)
+
+Id (GUID)
+
+AuthorId (User)
+
+Content (text)
+
+CreatedAt
+
+UpdatedAt
+
+ReplyToPostId (nullable)
+
+LikeCount (int) — denormalized optional
+
+MediaUrls (JSONB or separate table)
+
+Like
+
+Id
+
+UserId
+
+PostId
+
+CreatedAt
+
+RefreshToken
+
+Id
+
+UserId
+
+TokenHash
+
+ExpiresAt
+
+RevokedAt
+
+Implementation note: for hobby project, JSONB field in Post for media URLs (string[]) is OK. If you want normalized schema, create a Media table.
+
+7. API design (REST)
+
+Auth
+
+POST /api/auth/register — register (email, username, password).
+
+POST /api/auth/login — authenticate -> returns access token + sets refresh cookie.
+
+POST /api/auth/refresh — uses refresh cookie -> returns new access token.
+
+POST /api/auth/logout — revoke refresh token.
+
+Users
+
+GET /api/users/{username} — get public profile.
+
+PUT /api/users/me — update profile (auth required).
+
+POST /api/users/{username}/follow — follow user.
+
+POST /api/users/{username}/unfollow — unfollow user.
+
+Posts
+
+POST /api/posts — create a post (auth required). Accepts text + optional mediaIds.
+
+GET /api/posts/{id} — get a post.
+
+GET /api/posts?author=username&cursor=...&limit=20 — list posts by author (paginated).
+
+GET /api/timeline?cursor=...&limit=20 — timeline for current user.
+
+POST /api/posts/{id}/like — like / unlike (toggle) or separate endpoints.
+
+POST /api/posts/{id}/reply — create reply.
+
+Media
+
+POST /api/media/request-upload — returns signed upload URL or temporary token (if using MinIO/S3).
+
+PUT to signed URL or POST /api/media multi-part upload.
+
+GET /media/{file} — served by nginx from object store or routed to MinIO.
+
+8. Authentication & Security details
+
+Use ASP.NET Core Identity or a lightweight custom user + password hashing with Argon2/PBKDF2/BCrypt. For simplicity use ASP.NET Core Identity with EF Core.
+
+Use JWT access tokens with short TTL (e.g., 15m) and long-lived refresh tokens (store hashed in DB).
+
+Store refresh tokens in a secure HttpOnly, Secure cookie with SameSite=Lax or Strict depending on your cross-site needs. Or return refresh token in response body if you prefer but cookies are safer for XSS.
+
+Protect endpoints with [Authorize] and role checks (if admin features added).
+
+Hash tokens in DB, never store raw tokens.
+
+Rate-limit sign-in attempts and critical endpoints.
+
+Validate uploaded files by type, size, and scan filenames.
+
+Use HTTPS in front of nginx/caddy. For hobby VPS, Caddy automatically issues TLS certificates and can simplify config.
+
+9. Local development workflow
+
+Clone repo.
+
+cp .env.example .env and fill values (DB connection, JWT secret, etc.).
+
+Start dev services: docker-compose -f docker-compose.dev.yml up --build.
+
+Backend: use dotnet watch in development container or mount source into container for live reload.
+
+Frontend: Vite dev server with proxy to API or serve built files in production container.
+
+10. Dockerization
+
+Create separate Dockerfiles for api and frontend.
+
+Example: Dockerfile (API)
+
+# stage: build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet restore
+RUN dotnet publish -c Release -o /app/publish
+
+# stage: runtime
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
+WORKDIR /app
+COPY --from=build /app/publish ./
+ENV ASPNETCORE_URLS=http://+:5000
+EXPOSE 5000
+ENTRYPOINT ["dotnet", "YourApi.dll"]
+
+Example: Dockerfile (Frontend — Vite)
+
+FROM node:20-alpine as build
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+COPY . .
+RUN yarn build
+
+FROM nginx:stable-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY ./nginx/frontend.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+
+docker-compose.yml (simplified)
+
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: twitter_clone
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  api:
+    build: ./api
+    depends_on: [db]
+    environment:
+      - ConnectionStrings__Default=Host=db;Database=twitter_clone;Username=postgres;Password=example
+      - JWT__Secret=supersecret
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:stable
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on: [frontend, api]
+
+volumes:
+  db-data:
+
+Note: For production on a VPS, prefer nginx or caddy as reverse proxy, and bind ports 80/443 to the proxy only.
+
+11. Database migrations & seeding
+
+Use EF Core dotnet ef migrations add Initial and dotnet ef database update inside the API container during setup.
+
+Add a basic seed: create an admin/test user, several sample users, sample posts and follow relationships.
+
+Consider a migrate entrypoint or init container to run migrations automatically on deployment (idempotent).
+
+12. Frontend structure & components
+
+Use Vite + TypeScript.
+
+Folder structure (suggested):
+
+src/
+
+api/ — API client (fetch wrappers, auth handling)
+
+components/ — reusable UI components (Button, Avatar, PostCard, Composer)
+
+pages/ — routed pages (Home, Profile, Login, Register, Post)
+
+hooks/ — custom hooks (useAuth, useTimeline)
+
+state/ — context providers or Zustand store
+
+assets/ — images, icons
+
+Key components:
+
+PostComposer — create posts, attach image
+
+PostCard — show post, likes, replies
+
+Timeline — infinitely scroll list of posts (cursor pagination)
+
+ProfileHeader — user info and follow button
+
+AuthForm — login/register
+
+API client: centralize token handling; refresh on 401.
+
+13. File uploads & media handling
+
+Options:
+
+Simplest (local): Accept multipart upload to /api/media and save to a mounted directory (/data/uploads). Serve via nginx as /media/*.
+
+Better (MinIO): Run MinIO service in Docker Compose and use pre-signed URLs for direct PUT from client. Store returned URL in post record.
+
+Security:
+
+Limit file size (e.g., 5–10MB), allowed types (image/jpeg, image/png, `image/we
