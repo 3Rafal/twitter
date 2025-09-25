@@ -1,0 +1,54 @@
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: twitter_clone_db_dev
+    environment:
+      POSTGRES_DB: twitter_clone
+      POSTGRES_USER: twitter_user
+      POSTGRES_PASSWORD: twitter_pass_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twitter_user -d twitter_clone"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - twitter_network
+
+  # Backend API with hot reload
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: twitter_clone_backend_dev
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:8080
+      - ConnectionStrings__DefaultConnection=Host=db;Database=twitter_clone;Username=twitter_user;Password=twitter_pass_123
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/bin
+      - /app/obj
+      - /app/Properties
+    restart: unless-stopped
+    networks:
+      - twitter_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  twitter_network:
+    driver: bridge
