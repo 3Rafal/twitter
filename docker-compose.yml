@@ -24,7 +24,7 @@ services:
   # Backend API
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: twitter_clone_backend
     environment:
@@ -38,8 +38,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./appsettings.json:/app/appsettings.json
-      - ./appsettings.Development.json:/app/appsettings.Development.json
+      - ./backend/appsettings.json:/app/appsettings.json
+      - ./backend/appsettings.Development.json:/app/appsettings.Development.json
     restart: unless-stopped
     networks:
       - twitter_network

@@ -12,7 +12,7 @@ RETRY_COUNT=0
 echo "Waiting for database to be ready..."
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if docker-compose exec -T db pg_isready -U twitter_user -d twitter_clone > /dev/null 2>&1; then
+    if docker compose exec -T db pg_isready -U twitter_user -d twitter_clone > /dev/null 2>&1; then
         echo "Database is ready!"
         exit 0
     fi
@@ -24,5 +24,5 @@ done
 
 echo "Database failed to start after $MAX_RETRIES attempts"
 echo "Database logs:"
-docker-compose logs db
+docker compose logs db
 exit 1

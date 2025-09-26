@@ -23,7 +23,7 @@ services:
   # Backend API with hot reload
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile.dev
     container_name: twitter_clone_backend_dev
     environment:
@@ -37,7 +37,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - .:/app
+      - ./backend:/app
       - /app/bin
       - /app/obj
       - /app/Properties
