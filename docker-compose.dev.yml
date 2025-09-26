@@ -4,9 +4,9 @@ services:
     image: postgres:16-alpine
     container_name: twitter_clone_db_dev
     environment:
-      POSTGRES_DB: twitter_clone
-      POSTGRES_USER: twitter_user
-      POSTGRES_PASSWORD: twitter_pass_123
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -27,9 +27,10 @@ services:
       dockerfile: Dockerfile.dev
     container_name: twitter_clone_backend_dev
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://0.0.0.0:8080
-      - ConnectionStrings__DefaultConnection=Host=db;Database=twitter_clone;Username=twitter_user;Password=twitter_pass_123
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_URLS=${ASPNETCORE_URLS}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRY_MINUTES=${JWT_EXPIRY_MINUTES}
     ports:
       - "8080:8080"
       - "8081:8081"
@@ -52,7 +53,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: twitter_clone_frontend_dev
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV}
     ports:
       - "3000:3000"
     depends_on:

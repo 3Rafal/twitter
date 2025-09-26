@@ -12,6 +12,11 @@ builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
 
 // Add Entity Framework Core
+var dbName = Environment.GetEnvironmentVariable("POSTGRES_DB");
+var dbUser = Environment.GetEnvironmentVariable("POSTGRES_USER");
+var dbPass = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD");
+
+var connectionString = $"Host=db;Database={dbName};Username={dbUser};Password={dbPass}";
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
