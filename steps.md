@@ -17,7 +17,7 @@ This document breaks down the implementation of the Twitter clone project into s
         -   `frontend`: For the React frontend project.
     -   Add `.gitignore` for .NET, Node, and Docker.
 
--   [] **Step 1.3: Initialize Backend and Frontend Projects**
+-   [x] **Step 1.3: Initialize Backend and Frontend Projects**
     -   **Backend**: Inside the `backend` directory, create a new .NET 9 Web API project.
     -   **Frontend**: Inside `frontend`, run `npm create vite@latest` with a TypeScript template.
 
@@ -25,12 +25,12 @@ This document breaks down the implementation of the Twitter clone project into s
 
 ## 2. Feature Slice: User Authentication and Profiles
 
--   [ ] **Step 2.1: Backend - Database and User Model**
+-   [x] **Step 2.1: Backend - Database and User Model**
     -   Add EF Core NuGet packages (`Microsoft.EntityFrameworkCore`, `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore`).
     -   Define `User` and `RefreshToken` data models.
     -   Configure `AppDbContext` and create the initial database migration.
 
--   [ ] **Step 2.2: Backend - Authentication Endpoints**
+-   [x] **Step 2.2: Backend - Authentication Endpoints**
     -   Implement ASP.NET Core Identity.
     -   Create endpoints for user registration (`/api/auth/register`), login (`/api/auth/login`), token refresh (`/api/auth/refresh`), and logout (`/api/auth/logout`).
     -   Use HttpOnly cookies for refresh tokens and short-lived JWTs.
