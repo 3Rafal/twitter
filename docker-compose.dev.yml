@@ -45,6 +45,26 @@ services:
     networks:
       - twitter_network
 
+  # Frontend with hot reload
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: twitter_clone_frontend_dev
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/dist
+    restart: unless-stopped
+    networks:
+      - twitter_network
+
 volumes:
   postgres_data:
     driver: local

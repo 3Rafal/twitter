@@ -50,6 +50,7 @@ fi
 echo "Setup complete!"
 echo "Backend API: http://localhost:8080"
 echo "Swagger UI: http://localhost:8080/swagger"
+echo "Frontend: http://localhost:3000"
 echo "Database: localhost:5432"
 echo ""
 echo "To stop: docker compose -f docker-compose.dev.yml down"
